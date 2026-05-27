@@ -1,8 +1,10 @@
 ---
 category: test-coverage-overnight
 runtime: ralph
+billing_mode: direct-api
 budget_hours: 4
 cost_ceiling_usd: 25
+iteration_cap: 100
 capability_profile_match: true
 model_target: claude-sonnet-4-6
 variables: [PRD_PATH, REPO_ROOT, TEST_CMD, TARGET_MODULE]
@@ -28,6 +30,7 @@ You are running `test-coverage-overnight` on `{{TARGET_MODULE}}` (default: `src/
   <credential_scope><scrub_patterns>*PROD*, AWS_*, STRIPE_*, SUPABASE_SERVICE_*, *_PRIVATE_KEY, *_SECRET</scrub_patterns></credential_scope>
   <secret_scan_gate><pre_commit_scan>required</pre_commit_scan></secret_scan_gate>
   <cache_warming_strategy><cache_hit_target>0.8</cache_hit_target><forbid>timestamps_in_system_prompt, mid_run_tool_swap, mid_run_model_swap</forbid></cache_warming_strategy>
+  <iteration_budget><hard_cap>100</hard_cap><soft_cap>80</soft_cap><on_breach>ship_mode_then_abort</on_breach></iteration_budget>
 </overnight_contract>
 
 <test_coverage_gate>
@@ -63,7 +66,9 @@ You are running `test-coverage-overnight` on `{{TARGET_MODULE}}` (default: `src/
 ## Assumptions
 
 - Budget: 4h [user]
+- Billing mode: direct-api [user; ANTHROPIC_API_KEY set]
 - Cost ceiling: $25 [user; matches category default]
+- Iteration cap: 100 [default; ~25 iter/hr × 4h]
 - Runtime: ralph [user]
 - Target module: `src/auth/oauth.py` [inferred from "oauth module"]
 - Test command: `pytest --cov=src.auth.oauth --cov-branch ... tests/auth/` [default for branch-coverage gate]

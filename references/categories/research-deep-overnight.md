@@ -9,7 +9,9 @@ capability_profile:
   state_volume: high
 suggested_runtime: ralph
 suggested_budget_hours: 4
-suggested_cost_ceiling_usd: 20
+suggested_budget:
+  direct_api_usd: 20
+  oauth_iterations: 100
 ---
 
 # research-deep-overnight

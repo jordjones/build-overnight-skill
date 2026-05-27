@@ -1,8 +1,10 @@
 ---
 category: feature-build-overnight
 runtime: ralph
+billing_mode: direct-api
 budget_hours: 8
 cost_ceiling_usd: 40
+iteration_cap: 200
 capability_profile_match: true
 model_target: claude-opus-4-7
 variables: [PRD_PATH, REPO_ROOT, INTEGRATION_TEST_CMD]
@@ -35,6 +37,7 @@ You are running `feature-build-overnight` implementing SSO per `{{PRD_PATH}}` (d
   <credential_scope><scrub_patterns>*PROD*, AWS_*, STRIPE_*, SUPABASE_SERVICE_*</scrub_patterns></credential_scope>
   <secret_scan_gate><pre_commit_scan>required</pre_commit_scan></secret_scan_gate>
   <cache_warming_strategy><cache_hit_target>0.8</cache_hit_target><forbid>timestamps_in_system_prompt, mid_run_tool_swap, mid_run_model_swap</forbid></cache_warming_strategy>
+  <iteration_budget><hard_cap>200</hard_cap><soft_cap>160</soft_cap><on_breach>ship_mode_then_abort</on_breach></iteration_budget>
 </overnight_contract>
 
 <prd_decomposition_gate>
@@ -74,7 +77,9 @@ You are running `feature-build-overnight` implementing SSO per `{{PRD_PATH}}` (d
 ## Assumptions
 
 - Budget: 8h [user; matches universal default]
+- Billing mode: direct-api [user; ANTHROPIC_API_KEY set]
 - Cost ceiling: $40 [default]
+- Iteration cap: 200 [default; ~25 iter/hr × 8h]
 - Runtime: ralph [user]
 - PRD: `docs/prd-sso.md` [user]
 - Integration test: `pytest tests/integration/test_sso.py` [default; user confirms in interview]

@@ -35,12 +35,16 @@ Written once at run start by `bin/build-overnight-run`:
   "repo_root": "/Users/.../overnight-worktrees/...",
   "host": "Jordan-MacBook-Pro.local",
   "user": "jordanjones",
-  "build_overnight_version": "v1.0.0",
+  "build_overnight_version": "v1.0.0-rc2",
   "model": "claude-opus-4-7",
+  "billing_mode": "direct-api",
   "budget_hours": 8,
-  "cost_ceiling_usd": 40
+  "cost_ceiling_usd": 40,
+  "iteration_cap": 200
 }
 ```
+
+**`billing_mode` is one of `direct-api` or `oauth-subscription`** (rc2). Wrapper detects from `ANTHROPIC_API_KEY` presence at preflight; user override per `bin/build-overnight-run` env var `OVERNIGHT_BILLING_MODE`. Under `oauth-subscription`, `cost_ceiling_usd` is recorded as `null` (and **never enforced** by the loop); `iteration_cap` becomes the primary budget gate.
 
 ## events.jsonl schema
 
@@ -86,25 +90,54 @@ If `runtime=managed-agents`, `managed_agents_session_id` is set to the Anthropic
 
 ## COST.json schema
 
-Rolling cost summary, regenerated at each checkpoint:
+Rolling budget summary, regenerated at each checkpoint. **The shape is mode-conditional (rc2)**.
+
+### Direct-api mode
 
 ```json
 {
+  "billing_mode": "direct-api",
   "cumulative_cost_usd": 12.47,
   "cost_ceiling_usd": 40,
   "soft_cap_usd": 32,
   "iterations_costed": 47,
+  "iteration_cap": 200,
+  "iteration_soft_cap": 160,
   "model_mix": {"claude-opus-4-7": 0.85, "claude-haiku-4-5-20251001": 0.15},
   "cache_hit_rate_overall": 0.83,
   "cache_writes_usd": 2.10,
   "cache_reads_usd": 0.95,
   "net_cache_savings_usd": 24.30,
   "top_5_expensive_iterations": [
-    {"iteration": 12, "cost_usd": 1.82, "reason": "context_compaction"},
-    ...
+    {"iteration": 12, "cost_usd": 1.82, "reason": "context_compaction"}
   ]
 }
 ```
+
+### OAuth-subscription mode
+
+```json
+{
+  "billing_mode": "oauth-subscription",
+  "cumulative_cost_usd": null,
+  "cost_ceiling_usd": null,
+  "soft_cap_usd": null,
+  "iterations_completed": 47,
+  "iteration_cap": 200,
+  "iteration_soft_cap": 160,
+  "wall_clock_elapsed_minutes": 154,
+  "wall_clock_soft_cap_minutes": 432,
+  "wall_clock_hard_cap_minutes": 480,
+  "model_mix": {"claude-opus-4-7": 0.85, "claude-haiku-4-5-20251001": 0.15},
+  "cache_hit_rate_overall": 0.83,
+  "cache_anomalies_count": 1,
+  "top_5_slowest_iterations": [
+    {"iteration": 12, "wall_seconds": 187, "reason": "context_compaction"}
+  ]
+}
+```
+
+⚠️ **Phantom-USD warning:** under `oauth-subscription`, ALL `*_usd` fields MUST be `null`. The agent does NOT compute phantom dollars from list prices and `response.usage`. Any tool that surfaces a non-null USD value under subscription mode is wrong and should be reported as a bug. The `<cost_ceiling_usd mode="subscription_disabled">` clause in the drafted prompt forbids the agent from doing this computation; the wrapper enforces it on the telemetry side. See `references/meta/budget-and-telemetry.md` and `~/.claude/plans/jiggly-marinating-parnas-rc2-audit.md` §A.2 for the failure-mode reproduction this prevents.
 
 ## Resume-from-tag protocol (default)
 

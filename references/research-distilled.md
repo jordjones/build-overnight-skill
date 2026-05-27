@@ -20,7 +20,7 @@ Replaces what was originally a 50-item `build-overnight-research/` substrate. Th
 | D10 | Destructive-command policy (forbid force-push, rm -rf outside worktree, `gh pr merge`, prod-DB writes) prevents the Replit-class incidents | F11; R2 (mode #11); Safety §3; hookify rules in `~/.claude/rules/` | Clauses C10 + C11 + reuses hookify enforcement |
 | D11 | PR-as-handoff is the universal morning artifact: `overnight/<run-id>-<slug>` branch, draft state, `[OVERNIGHT]` prefix, `overnight-run` label, never auto-merge | F29; R5 §1, §2; R1 §5 | Clause C11 + `morning-review-artifact.md` PR-body template |
 | D12 | Credential scope (scrub `*PROD*`, `AWS_*`, `STRIPE_*`, `SUPABASE_SERVICE_*`) gates the agent from prod blast-radius | F31; Safety §3; project memory (Jordan's stack) | Clauses C12 + C13 |
-| D13 | Prompt-cache hygiene (no timestamps in system prompt, no mid-run model swaps, ≥80% hit target) drives 5× cost delta on 8h loops per arXiv 2601.06007v2 | F27; R3 §3 (cache TTL 5min/1h-extended; $50–100 uncached vs $10–19 cached) | Clause C14 + `cost-and-telemetry.md` cache-hit measurement |
+| D13 | Prompt-cache hygiene (no timestamps in system prompt, no mid-run model swaps, ≥80% hit target) drives 5× cost delta on 8h loops per arXiv 2601.06007v2 | F27; R3 §3 (cache TTL 5min/1h-extended; $50–100 uncached vs $10–19 cached) | Clause C14 + `budget-and-telemetry.md` cache-hit measurement (rc2: renamed from `cost-and-telemetry.md`) |
 | D14 | `.overnight/<run-id>/` directory layout is the converged audit/telemetry surface; `events.jsonl` is audit-only in v1 (NOT resume source per Reconciler 2) | F21; R4 §2; R5 §1; Reconciler 2 §"Proposed resolution" | `audit-trail.md` spec + `bin/build-overnight-run` writes there |
 
 ## Runtime landscape (R1, R4, R7)

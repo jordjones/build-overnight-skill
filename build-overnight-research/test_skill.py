@@ -62,7 +62,9 @@ UNIVERSAL_CLAUSES = [
     "<no_test_weakening>", "<externalized_state>", "<partial_credit_handoff>",
     "<worker_judge_separation>", "<read_only_paths>", "<destructive_command_policy>",
     "<git_remote_policy>", "<credential_scope>", "<secret_scan_gate>", "<cache_warming_strategy>",
+    "<iteration_budget>",  # C15 added in rc2
 ]
+VALID_BILLING_MODES = {"direct-api", "oauth-subscription"}
 EXPECTED_CATEGORIES = {
     "test-coverage-overnight", "bug-hunt-overnight", "feature-build-overnight",
     "refactor-sweep-overnight", "docs-pass-overnight", "research-deep-overnight",
@@ -73,8 +75,8 @@ CAPABILITY_PROFILE_KEYS = {
     "budget_hours_typical", "state_volume",
 }
 LIBRARY_REQUIRED_FIELDS = {
-    "category", "runtime", "budget_hours", "cost_ceiling_usd",
-    "capability_profile_match", "model_target", "variables",
+    "category", "runtime", "billing_mode", "budget_hours", "cost_ceiling_usd",
+    "iteration_cap", "capability_profile_match", "model_target", "variables",
     "created_at", "source_input",
 }
 URL_PATTERN = re.compile(r"https?://[^\s\)\]\>\"]+")
@@ -135,7 +137,7 @@ def layer1(r: Report) -> None:
         if missing_clauses:
             r.fail(f"Universal scaffold missing clauses: {missing_clauses}")
         else:
-            r.ok(f"Universal scaffold contains all 14 clauses C1–C14")
+            r.ok(f"Universal scaffold contains all {len(UNIVERSAL_CLAUSES)} clauses C1–C{len(UNIVERSAL_CLAUSES)}")
 
     # L1.3 + L1.4 Category files
     for name in sorted(EXPECTED_CATEGORIES):
@@ -157,34 +159,72 @@ def layer1(r: Report) -> None:
         elif not (1 <= cp["budget_hours_typical"] <= 12):
             r.warn(f"{name}: budget_hours_typical={cp['budget_hours_typical']} outside 1–12h")
 
-    # L1.5 Library
+    # L1.5 + L1.8 + L1.11 Library
     library_files = sorted(LIBRARY_DIR.glob("2026-*.md"))
     if not library_files:
         r.fail("library/ has no dated entries")
+    seen_modes: set[str] = set()
     for p in library_files:
         fm, body = _split_frontmatter(p.read_text())
         if fm is None:
             r.fail(f"library/{p.name}: no frontmatter"); continue
         miss = LIBRARY_REQUIRED_FIELDS - set(fm.keys())
         if miss:
-            r.fail(f"library/{p.name}: missing fields {miss}")
-        elif fm["category"] not in EXPECTED_CATEGORIES:
-            r.fail(f"library/{p.name}: category '{fm['category']}' not in dispatch")
-        else:
-            # L1.4 coherence: soft = 0.8 * hard (cost) AND 0.9 * hard (time) — checked from body XML
-            body_lower = body.lower()
-            if "<cost_ceiling_usd>" not in body_lower:
-                r.fail(f"library/{p.name}: body missing <cost_ceiling_usd>")
+            r.fail(f"library/{p.name}: missing fields {miss}"); continue
+        if fm["category"] not in EXPECTED_CATEGORIES:
+            r.fail(f"library/{p.name}: category '{fm['category']}' not in dispatch"); continue
+        # L1.8 billing_mode is valid
+        mode = fm["billing_mode"]
+        if mode not in VALID_BILLING_MODES:
+            r.fail(f"library/{p.name}: billing_mode={mode!r} not in {VALID_BILLING_MODES}"); continue
+        seen_modes.add(mode)
+        # L1.11 body XML matches billing_mode
+        body_lower = body.lower()
+        if "<cost_ceiling_usd>" not in body_lower and 'subscription_disabled' not in body_lower:
+            r.fail(f"library/{p.name}: body missing both <cost_ceiling_usd> and subscription_disabled marker")
+            continue
+        if mode == "oauth-subscription":
+            # subscription entries MUST emit the subscription_disabled marker and MUST NOT emit <hard_cap>N</hard_cap>
+            # in the cost_ceiling block. We accept <hard_cap> inside <iteration_budget> or <time_budget>.
+            # Spot-check by looking for the substring in the cost-ceiling area.
+            cost_block = re.search(r"<cost_ceiling_usd[^>]*>.*?</cost_ceiling_usd>", body, re.DOTALL)
+            if cost_block is None:
+                r.fail(f"library/{p.name}: <cost_ceiling_usd> block not parseable"); continue
+            block_text = cost_block.group(0)
+            if 'subscription_disabled' not in block_text:
+                r.fail(f"library/{p.name}: oauth-subscription mode but cost_ceiling block has no subscription_disabled marker")
+            elif "<hard_cap>" in block_text and re.search(r"<hard_cap>\s*\d+\s*</hard_cap>", block_text):
+                r.fail(f"library/{p.name}: oauth-subscription mode emits phantom USD <hard_cap> in cost-ceiling block")
             else:
-                hard_m = re.search(r"<hard_cap>(\d+)</hard_cap>", body)
-                soft_m = re.search(r"<soft_cap>(\d+)</soft_cap>", body)
-                if hard_m and soft_m:
-                    hard, soft = int(hard_m.group(1)), int(soft_m.group(1))
-                    expected = round(hard * 0.8)
-                    if abs(soft - expected) > 1:
-                        r.fail(f"library/{p.name}: soft_cap={soft} != 0.8 * hard_cap={hard} (expected ~{expected})")
+                r.ok(f"library/{p.name}: oauth-subscription clauses correct")
+            # L1.4 coherence: iteration_budget hard/soft when present
+            iter_block = re.search(r"<iteration_budget>.*?</iteration_budget>", body, re.DOTALL)
+            if iter_block:
+                h = re.search(r"<hard_cap>(\d+)</hard_cap>", iter_block.group(0))
+                s = re.search(r"<soft_cap>(\d+)</soft_cap>", iter_block.group(0))
+                if h and s:
+                    hi, si = int(h.group(1)), int(s.group(1))
+                    if abs(si - round(hi * 0.8)) > 1:
+                        r.fail(f"library/{p.name}: iteration soft={si} != 0.8 * hard={hi}")
                     else:
-                        r.ok(f"library/{p.name}: cost coherence ({hard}/{soft})")
+                        r.ok(f"library/{p.name}: iteration coherence ({hi}/{si})")
+        else:  # direct-api
+            hard_m = re.search(r"<cost_ceiling_usd>\s*<hard_cap>(\d+)</hard_cap>\s*<soft_cap>(\d+)</soft_cap>", body)
+            if hard_m:
+                hard, soft = int(hard_m.group(1)), int(hard_m.group(2))
+                expected = round(hard * 0.8)
+                if abs(soft - expected) > 1:
+                    r.fail(f"library/{p.name}: cost soft={soft} != 0.8 * hard={hard}")
+                else:
+                    r.ok(f"library/{p.name}: cost coherence ({hard}/{soft})")
+            else:
+                r.fail(f"library/{p.name}: direct-api mode but no parseable <cost_ceiling_usd> block")
+    # L1.8 require both modes present
+    missing_modes = VALID_BILLING_MODES - seen_modes
+    if missing_modes:
+        r.warn(f"library/ has no examples of billing_mode={missing_modes}")
+    else:
+        r.ok(f"library/ has examples of both billing modes: {sorted(seen_modes)}")
 
     # L1.6 dispatch sync
     if VALIDATE_INDEX.exists():

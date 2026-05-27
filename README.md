@@ -6,7 +6,12 @@ Sibling skill to [build-prompt](https://github.com/jordjones/build-prompt-skill)
 
 ## Status
 
-**v1.0.0-rc1** (2026-05-27). All scaffold and category work complete; Layer 1 + thin Layer 2 test harness green. Final `v1.0.0` tag is gated on **one successful real overnight run** through the skill (per the convention's Reconciler #1 compromise).
+**v1.0.0-rc2** (2026-05-27). rc2 adds billing-mode correctness: clause C1 `<cost_ceiling_usd>` is now mode-conditional; the new C15 `<iteration_budget>` becomes the primary stop-on-budget gate under Claude Code OAuth / Codex CLI subscriptions. Total universal clauses: **15** (was 14). The 20/20 Layer 1 + 3/3 Layer 2 classification suite is green, both modes are exercised. Final `v1.0.0` tag (no `-rc`) still gated on **one successful real overnight run** through the skill.
+
+## Billing modes
+
+- **`direct-api`** — `ANTHROPIC_API_KEY` set; the agent reads `response.usage` and enforces a USD cost ceiling. Default $40 hard / $32 soft.
+- **`oauth-subscription`** — Claude Code Pro/Max or Codex CLI; flat-rate billing. USD ceiling is structurally unavailable inside the loop, so the agent uses C15 iteration cap (default 200 hard / 160 soft) + C2 wall-clock (default 8h / 7.2h) instead. No phantom USD surfaces in reports. See `references/meta/budget-and-telemetry.md`.
 
 ## Usage
 

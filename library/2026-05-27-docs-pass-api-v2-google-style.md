@@ -1,8 +1,10 @@
 ---
 category: docs-pass-overnight
 runtime: ralph
+billing_mode: direct-api
 budget_hours: 3
 cost_ceiling_usd: 15
+iteration_cap: 75
 capability_profile_match: true
 model_target: claude-haiku-4-5-20251001
 variables: [PRD_PATH, REPO_ROOT, TARGET_DIR]
@@ -35,6 +37,7 @@ You are running `docs-pass-overnight` to add Google-style docstrings with exampl
   <credential_scope><scrub_patterns>*PROD*, AWS_*, STRIPE_*, SUPABASE_SERVICE_*</scrub_patterns></credential_scope>
   <secret_scan_gate><pre_commit_scan>required</pre_commit_scan></secret_scan_gate>
   <cache_warming_strategy><cache_hit_target>0.8</cache_hit_target><forbid>timestamps_in_system_prompt, mid_run_tool_swap, mid_run_model_swap</forbid></cache_warming_strategy>
+  <iteration_budget><hard_cap>75</hard_cap><soft_cap>60</soft_cap><on_breach>ship_mode_then_abort</on_breach></iteration_budget>
 </overnight_contract>
 
 <no_hallucinated_signatures>
@@ -74,7 +77,9 @@ You are running `docs-pass-overnight` to add Google-style docstrings with exampl
 ## Assumptions
 
 - Budget: 3h [user]
+- Billing mode: direct-api [user; ANTHROPIC_API_KEY set]
 - Cost ceiling: $15 [default for docs-pass — smallest of all categories]
+- Iteration cap: 75 [default; ~25 iter/hr × 3h]
 - Runtime: ralph [user]
 - Target: `src/api/v2/` public functions only [user]
 - Style: Google-style with examples [user]

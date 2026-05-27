@@ -9,7 +9,9 @@ capability_profile:
   state_volume: low
 suggested_runtime: ralph
 suggested_budget_hours: 4
-suggested_cost_ceiling_usd: 25
+suggested_budget:
+  direct_api_usd: 25
+  oauth_iterations: 100
 ---
 
 # test-coverage-overnight

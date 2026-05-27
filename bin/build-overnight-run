@@ -30,6 +30,15 @@ OVERNIGHT_DIR="$REPO_ROOT/.overnight/$RUN_ID"
 LOCK_DIR="$HOME/overnight-worktrees/.locks"
 LOCK_FILE="$LOCK_DIR/$(echo "$REPO_ROOT" | tr '/' '_').lock"
 
+# rc2 — billing-mode detection. Env override wins; otherwise sniff ANTHROPIC_API_KEY.
+if [[ -n "${OVERNIGHT_BILLING_MODE:-}" ]]; then
+  BILLING_MODE="$OVERNIGHT_BILLING_MODE"
+elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  BILLING_MODE="direct-api"
+else
+  BILLING_MODE="oauth-subscription"
+fi
+
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 event() {
   # Append a JSONL event to the audit trail. Args: kind="..." key=val ...
@@ -96,19 +105,24 @@ cat > "$OVERNIGHT_DIR/MANIFEST.json" <<EOF
 {
   "run_id": "$RUN_ID",
   "runtime": "$RUNTIME",
+  "billing_mode": "$BILLING_MODE",
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "repo_root": "$REPO_ROOT",
   "host": "$(hostname)",
   "user": "$(whoami)",
-  "build_overnight_version": "v1.0.0"
+  "build_overnight_version": "v1.0.0-rc2"
 }
 EOF
 
 # Snapshot git reflog so we can always recover the entry point
 git -C "$REPO_ROOT" reflog show --all > "$OVERNIGHT_DIR/git-reflog-snapshot.txt" 2>/dev/null || true
 
-event "run_started" "runtime=$RUNTIME" "repo=$REPO_ROOT"
+event "run_started" "runtime=$RUNTIME" "billing_mode=$BILLING_MODE" "repo=$REPO_ROOT"
 log "audit-trail directory: $OVERNIGHT_DIR"
+log "billing mode: $BILLING_MODE"
+if [[ "$BILLING_MODE" == "oauth-subscription" ]]; then
+  log "  note: under subscription, COST.json *_usd fields will be null; iteration_cap is the primary budget gate."
+fi
 
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
   log "dry-run complete; not launching agent"

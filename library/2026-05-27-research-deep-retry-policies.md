@@ -1,8 +1,10 @@
 ---
 category: research-deep-overnight
 runtime: ralph
+billing_mode: oauth-subscription
 budget_hours: 4
-cost_ceiling_usd: 20
+cost_ceiling_usd: null
+iteration_cap: 100
 capability_profile_match: true
 model_target: claude-sonnet-4-6
 variables: [PRD_PATH, REPO_ROOT, RESEARCH_QUESTION]
@@ -13,7 +15,7 @@ source_input: "research 2026 best practices for LLM agent retry policies on rate
 You are running `research-deep-overnight` on `{{RESEARCH_QUESTION}}` (default: *"What are the documented 2026 best practices for LLM agent retry policies on rate-limit errors?"*). PRD at `{{PRD_PATH}}`. Deliverable: a structured RESEARCH_REPORT.md at `.overnight/<run-id>/`.
 
 <overnight_contract>
-  <cost_ceiling_usd><hard_cap>20</hard_cap><soft_cap>16</soft_cap><on_breach>abort</on_breach></cost_ceiling_usd>
+  <cost_ceiling_usd mode="subscription_disabled"><reason>Claude Code OAuth subscription; no per-call USD to enforce. NOTE: Firecrawl/Tavily/Exa external API spend is separately metered via &lt;external_api_budget&gt; below and is NOT subscription-flat.</reason><surface_phantom_usd_in_report>false</surface_phantom_usd_in_report><primary_budget_gate>C15 iteration_budget</primary_budget_gate></cost_ceiling_usd>
   <time_budget><hard_hours>4</hard_hours><soft_hours>3.6</soft_hours><self_extension>forbidden</self_extension></time_budget>
   <progress_proof><required>commit_sha, diff_stat, sources_retrieved_count, citations_verified_count</required></progress_proof>
   <drift_detection><scope_manifest>RESEARCH_REPORT.md, artifacts/sources/ — read-only on src/, no code changes</scope_manifest><out_of_scope_limit>3</out_of_scope_limit><prd_reread_every_n_iterations>10</prd_reread_every_n_iterations></drift_detection>
@@ -28,6 +30,7 @@ You are running `research-deep-overnight` on `{{RESEARCH_QUESTION}}` (default: *
   <credential_scope><scrub_patterns>*PROD*, AWS_*, STRIPE_*</scrub_patterns></credential_scope>
   <secret_scan_gate><pre_commit_scan>required</pre_commit_scan></secret_scan_gate>
   <cache_warming_strategy><cache_hit_target>0.8</cache_hit_target><forbid>timestamps_in_system_prompt, mid_run_tool_swap, mid_run_model_swap</forbid></cache_warming_strategy>
+  <iteration_budget><hard_cap>100</hard_cap><soft_cap>80</soft_cap><on_breach>ship_mode_then_abort</on_breach></iteration_budget>
 </overnight_contract>
 
 <no_source_fabrication>
@@ -83,7 +86,9 @@ You are running `research-deep-overnight` on `{{RESEARCH_QUESTION}}` (default: *
 ## Assumptions
 
 - Budget: 4h [user]
-- Cost ceiling: $20 [default for research-deep — tighter than universal $40 because external API burn]
+- Billing mode: oauth-subscription [user; ANTHROPIC_API_KEY unset; using Claude Code OAuth]
+- Cost ceiling: N/A for LLM calls (subscription); external API budget tracked separately (Firecrawl 50, Tavily 30, Exa 20)
+- Iteration cap: 100 [default; ~25 iter/hr × 4h]
 - Runtime: ralph [user]
 - Research question: 2026 LLM agent retry policies for rate limits [user]
 - External API budget: Firecrawl 50, Tavily 30, Exa 20 [default]

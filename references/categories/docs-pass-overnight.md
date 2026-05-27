@@ -9,7 +9,9 @@ capability_profile:
   state_volume: low
 suggested_runtime: ralph
 suggested_budget_hours: 3
-suggested_cost_ceiling_usd: 15
+suggested_budget:
+  direct_api_usd: 15
+  oauth_iterations: 75
 ---
 
 # docs-pass-overnight

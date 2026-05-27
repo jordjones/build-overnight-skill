@@ -1,8 +1,10 @@
 ---
 category: bug-hunt-overnight
 runtime: ralph
+billing_mode: oauth-subscription
 budget_hours: 6
-cost_ceiling_usd: 30
+cost_ceiling_usd: null
+iteration_cap: 150
 capability_profile_match: true
 model_target: claude-opus-4-7
 variables: [PRD_PATH, REPO_ROOT, FAILING_TEST]
@@ -15,7 +17,7 @@ You are running `bug-hunt-overnight` on `{{FAILING_TEST}}` (default: `tests/bill
 Goal: the named test passes **50 consecutive times** AND the broader `pytest tests/billing/` suite stays green AND `ROOT_CAUSE.md` is written with the five required sections.
 
 <overnight_contract>
-  <cost_ceiling_usd><hard_cap>30</hard_cap><soft_cap>24</soft_cap><on_breach>abort</on_breach></cost_ceiling_usd>
+  <cost_ceiling_usd mode="subscription_disabled"><reason>Claude Code OAuth subscription; no per-call USD to enforce</reason><surface_phantom_usd_in_report>false</surface_phantom_usd_in_report><primary_budget_gate>C15 iteration_budget</primary_budget_gate></cost_ceiling_usd>
   <time_budget><hard_hours>6</hard_hours><soft_hours>5.4</soft_hours><self_extension>forbidden</self_extension></time_budget>
   <progress_proof><required>commit_sha, diff_stat, test_exit_code, diff_hash, consecutive_pass_count</required></progress_proof>
   <drift_detection><scope_manifest>tests/billing/, src/billing/ (callers only), ROOT_CAUSE.md</scope_manifest><out_of_scope_limit>3</out_of_scope_limit><prd_reread_every_n_iterations>10</prd_reread_every_n_iterations></drift_detection>
@@ -30,6 +32,7 @@ Goal: the named test passes **50 consecutive times** AND the broader `pytest tes
   <credential_scope><scrub_patterns>*PROD*, AWS_*, STRIPE_*, SUPABASE_SERVICE_*</scrub_patterns></credential_scope>
   <secret_scan_gate><pre_commit_scan>required</pre_commit_scan></secret_scan_gate>
   <cache_warming_strategy><cache_hit_target>0.8</cache_hit_target><forbid>timestamps_in_system_prompt, mid_run_tool_swap, mid_run_model_swap</forbid></cache_warming_strategy>
+  <iteration_budget><hard_cap>150</hard_cap><soft_cap>120</soft_cap><on_breach>ship_mode_then_abort</on_breach></iteration_budget>
 </overnight_contract>
 
 <oscillation_detector>
@@ -76,7 +79,9 @@ Goal: the named test passes **50 consecutive times** AND the broader `pytest tes
 ## Assumptions
 
 - Budget: 6h [user]
-- Cost ceiling: $30 [default for bug-hunt]
+- Billing mode: oauth-subscription [user; ANTHROPIC_API_KEY unset; using Claude Code OAuth]
+- Cost ceiling: N/A under subscription (cumulative cost is meaningless on flat-rate)
+- Iteration cap: 150 [default; ~25 iter/hr × 6h]
 - Runtime: ralph [user]
 - Failing test: `tests/billing/test_invoice.py::test_pro_rated_refund` [user]
 - Hypothesis: race condition is a *hypothesis* not a conclusion [reframed]

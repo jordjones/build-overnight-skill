@@ -9,7 +9,9 @@ capability_profile:
   state_volume: medium
 suggested_runtime: ralph
 suggested_budget_hours: 6
-suggested_cost_ceiling_usd: 30
+suggested_budget:
+  direct_api_usd: 30
+  oauth_iterations: 150
 ---
 
 # refactor-sweep-overnight

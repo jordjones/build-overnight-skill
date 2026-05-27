@@ -38,3 +38,4 @@
 {"t":0,"agent":"a9c4f07","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":136087}
 {"t":0,"agent":"aa4af84","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"aa4af84","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":187434}
+{"t":0,"agent":"adff207","agent_type":"unknown","event":"agent_stop","success":true}

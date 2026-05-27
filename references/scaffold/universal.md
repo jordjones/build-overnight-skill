@@ -1,19 +1,31 @@
-# Universal scaffold — 14 mandatory overnight clauses (C1–C14)
+# Universal scaffold — 15 mandatory overnight clauses (C1–C15)
 
-Every prompt drafted by `/build-overnight` MUST emit all 14 clauses below as a `<overnight_contract>` block, in addition to category-specific mitigation clauses and the standard `<stop_rules>` mandated by build-prompt.
+Every prompt drafted by `/build-overnight` MUST emit all 15 clauses below as a `<overnight_contract>` block, in addition to category-specific mitigation clauses and the standard `<stop_rules>` mandated by build-prompt.
 
 Defaults shown are the v1 baseline (user-confirmed in convention Phase 0.6). The interview may override them per run; the contract always emits *some* value.
+
+**Billing-mode awareness (rc2):** Clause C1 (`<cost_ceiling_usd>`) is **conditional on billing mode**. The skill asks the user in Step 4 for `billing_mode ∈ {direct-api, oauth-subscription}` and emits the appropriate variant. Under `oauth-subscription`, USD costs are NOT enforceable from inside the loop (flat-rate subscription; no per-call cost surfaces reliably to the agent), so C1 is emitted as a `subscription_disabled` marker and C15 `<iteration_budget>` becomes the primary stop-on-budget gate.
 
 ```xml
 <overnight_contract>
 
-  <!-- C1: cost discipline -->
+  <!-- C1: cost discipline (direct-api variant) -->
   <cost_ceiling_usd>
     <hard_cap>40</hard_cap>
     <soft_cap>32</soft_cap>
     <on_breach>abort</on_breach>
     <on_soft_breach>enter_ship_mode</on_soft_breach>
+    <accumulator>read response.usage; cumulate cost_usd_iter from list prices</accumulator>
   </cost_ceiling_usd>
+
+  <!-- C1: cost discipline (oauth-subscription variant; emitted INSTEAD of the above) -->
+  <!--
+  <cost_ceiling_usd mode="subscription_disabled">
+    <reason>flat-rate Claude Code Pro/Max subscription; no per-call USD to enforce</reason>
+    <surface_phantom_usd_in_report>false</surface_phantom_usd_in_report>
+    <primary_budget_gate>C15 iteration_budget</primary_budget_gate>
+  </cost_ceiling_usd>
+  -->
 
   <!-- C2: wall-clock discipline -->
   <time_budget>
@@ -98,12 +110,22 @@ Defaults shown are the v1 baseline (user-confirmed in convention Phase 0.6). The
     <on_match>abort_commit</on_match>
   </secret_scan_gate>
 
-  <!-- C14: cost discipline via cache hygiene -->
+  <!-- C14: cache hygiene (cost AND latency discipline; mode-agnostic) -->
   <cache_warming_strategy>
     <cache_hit_target>0.8</cache_hit_target>
     <forbid>timestamps_in_system_prompt, mid_run_tool_swap, mid_run_model_swap</forbid>
     <prefer>static_breakpoint_above_tools, append_only_message_history</prefer>
+    <note>Latency and cache savings apply under both billing modes. Under subscription, the user does not see USD savings but does see faster iteration.</note>
   </cache_warming_strategy>
+
+  <!-- C15: iteration cap (rc2; primary budget gate under subscription, secondary under direct-api) -->
+  <iteration_budget>
+    <hard_cap>200</hard_cap>
+    <soft_cap>160</soft_cap>
+    <on_breach>ship_mode_then_abort</on_breach>
+    <on_soft_breach>enter_ship_mode</on_soft_breach>
+    <rationale>Sized at ~25 iter/hr × 8h. User-overridable per category and per run. Under oauth-subscription this is the primary stop-on-budget gate.</rationale>
+  </iteration_budget>
 
 </overnight_contract>
 ```
@@ -116,4 +138,4 @@ Defaults shown are the v1 baseline (user-confirmed in convention Phase 0.6). The
 
 ## Why every clause is universal (not optional)
 
-The convention's CONVERGENT_FINDINGS.md (F1–F14, F27, F29, F31) shows 3+ independent voices agreed each of these is necessary. Source attribution for each clause is in `references/research-distilled.md`.
+The convention's CONVERGENT_FINDINGS.md (F1–F14, F27, F29, F31) shows 3+ independent voices agreed each of these is necessary. Source attribution for each clause is in `references/research-distilled.md`. C15 (`<iteration_budget>`) was added in rc2 to gate budget under subscription billing where USD enforcement is structurally unavailable; see `references/meta/budget-and-telemetry.md` for the mode-conditional kill-switch layering and `~/.claude/plans/jiggly-marinating-parnas-rc2-audit.md` for the audit that drove the change.

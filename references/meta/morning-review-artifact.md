@@ -28,9 +28,12 @@ If `why_stopped != DONE`, replace `FINAL_REPORT.md` with `FAILURE.md` (same stru
 
 ### Summary
 - **Goal:** <restated from PRD.md, verbatim>
-- **Wall-clock:** 5h 42m (cap: 8h)
-- **Cost:** $14.20 (cap: $40)
-- **Iterations:** 47
+- **Billing mode:** `direct-api` | `oauth-subscription`
+- **Wall-clock:** 5h 42m (cap: 8h, soft: 7.2h)
+- **Budget:**
+  - if `direct-api`: **$14.20 (cap: $40, soft: $32)**
+  - if `oauth-subscription`: **47 iterations (cap: 200, soft: 160)** — no USD reported (subscription)
+- **Iterations:** 47 (always shown, regardless of mode)
 - **Cache hit rate:** 83%
 
 ### What shipped

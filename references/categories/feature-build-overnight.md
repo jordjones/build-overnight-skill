@@ -9,7 +9,9 @@ capability_profile:
   state_volume: high
 suggested_runtime: ralph
 suggested_budget_hours: 8
-suggested_cost_ceiling_usd: 40
+suggested_budget:
+  direct_api_usd: 40
+  oauth_iterations: 200
 ---
 
 # feature-build-overnight

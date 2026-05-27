@@ -29,7 +29,11 @@ Follow these steps in order. Do not skip steps. Do not ask the user to confirm t
 
 **Step 4 — Run the interview.** Apply the question bank from the category file, following the rules in `references/meta/interview-loop.md`. Hard caps: ≤2 rounds, ≤5 questions total, ≤3 questions per round. When the user bails out ("good enough," "just do it," "ship it," "proceed," "skip," "your best guess"), stop asking immediately and proceed to step 5 with defaults filled in. When the trivial-input fast-path applies (the user's raw input already fills ≥80% of the required slots), skip the interview entirely.
 
-**One question is always required regardless of bail-out:** *"Which runtime should this target? (1) ralph — default, zero marginal cost, local Claude Code self-loop. (2) managed-agents — Anthropic hosted, $0.08/session-hour. (3) continuous-claude — time-bounded with `--max-duration`. (4) other (ralphthon / ralph-loop / claude-p-chain — adapts from ralph)."* Suggest a default by matching the category's `capability_profile` against `runtime-adaptation.md`'s table.
+**Two questions are always required regardless of bail-out:**
+
+1. *"Which runtime should this target? (1) ralph — default, zero marginal cost, local Claude Code self-loop. (2) managed-agents — Anthropic hosted, $0.08/session-hour. (3) continuous-claude — time-bounded with `--max-duration`. (4) other (ralphthon / ralph-loop / claude-p-chain — adapts from ralph)."* Suggest a default by matching the category's `capability_profile` against `runtime-adaptation.md`'s table.
+
+2. *"Which billing mode? (1) direct-api — you have `ANTHROPIC_API_KEY` set; the agent enforces a USD cost ceiling (clause C1) via `response.usage` accumulation. (2) oauth-subscription — Claude Code Pro/Max or Codex CLI session; USD ceiling is structurally unavailable, so the agent uses the iteration cap (C15) + time budget (C2) instead."* Sniff `ANTHROPIC_API_KEY` for the default — set → suggest `direct-api`; unset → suggest `oauth-subscription`. See `references/meta/budget-and-telemetry.md` for the mode-conditional behavior. Under `oauth-subscription`, NEVER emit `<hard_cap>N</hard_cap>` USD values; emit the `subscription_disabled` marker form per the scaffold.
 
 **Step 5 — Draft the refined prompt.** Fill the template from the category file. The drafted prompt MUST include:
 
@@ -39,7 +43,7 @@ Follow these steps in order. Do not skip steps. Do not ask the user to confirm t
 4. The standard build-prompt `<stop_rules>` clause as a sub-section of `<output_format>`. Default text for overnight: *"Stop when goal-met per PRD acceptance criteria OR soft time/cost cap reached (ship-mode) OR drift limit hit OR ambiguity requires human; always commit, tag, push branch, open draft PR with [OVERNIGHT] prefix, write FINAL_REPORT.md or FAILURE.md before exit; never auto-merge, never force-push, never overrun hard cap."*
 5. An `OVERNIGHT_RUN_REPORT.md` skeleton instruction referencing `references/meta/morning-review-artifact.md`.
 
-Immediately beneath the draft, surface an "Assumptions" section listing every slot filled by inference or default, labeled `[inferred]` or `[default]`. Always list: `Budget: 8h [default]`, `Cost ceiling: $40 [default]`, `Runtime: <chosen> [user]`, `Sandbox: Tier-1 worktree [default]`, `Resume model: git-tag [default]`. Override any of these only if user-supplied.
+Immediately beneath the draft, surface an "Assumptions" section listing every slot filled by inference or default, labeled `[inferred]` or `[default]`. Always list: `Time budget: 8h [default]`, `Runtime: <chosen> [user]`, `Sandbox: Tier-1 worktree [default]`, `Resume model: git-tag [default]`, `Billing mode: <chosen> [user|inferred]`. Then, **conditional on `billing_mode`**: if `direct-api`, list `Cost ceiling: $40 [default]`; if `oauth-subscription`, list `Iteration cap: 200 [default]` and **do NOT surface a phantom USD ceiling** (per `budget-and-telemetry.md`). Override any of these only if user-supplied.
 
 **Step 6 — Review loop.** Ask: *"Looks good? Edits, or ship it?"* Accept free-form edits, approval, or a bail-out. Apply edits by updating the draft and re-surfacing assumptions if any defaults changed. The review is scored against `references/meta/quality-rubric.md` (5 dimensions) PLUS the 4 overnight-specific dimensions described in `references/research-distilled.md`: Overnight Discipline (time/checkpoint/termination coherence), Drift Resistance, Safety Posture, Verifiable Completion. One review round is the default; if the user requests more, honor.
 
@@ -106,7 +110,7 @@ In addition to the 5 standard dimensions from `references/meta/quality-rubric.md
 
 | Dimension | Auto-fail condition |
 |---|---|
-| Overnight Discipline | `<cost_ceiling_usd>` or `<time_budget>` clause missing; `hard_cap < 2 × checkpoint_cadence`; `soft_cap != 0.9 × hard_cap` |
+| Overnight Discipline | `<time_budget>` clause missing; OR `billing_mode=direct-api` and `<cost_ceiling_usd>` clause missing or contains `mode="subscription_disabled"`; OR `billing_mode=oauth-subscription` and `<cost_ceiling_usd>` contains `<hard_cap>` USD value (phantom); OR `<iteration_budget>` clause missing under either mode; OR `soft_cap != 0.9 × hard_cap` for time budget |
 | Drift Resistance | `<drift_detection>` missing or `scope_manifest` empty; no PRD re-read cadence |
 | Safety Posture | `<read_only_paths>`, `<write_scope>`, `<destructive_command_policy>`, `<git_remote_policy>`, `<credential_scope>` not all present |
 | Verifiable Completion | `<progress_proof>` missing required fields; `<worker_judge_separation>` absent |
