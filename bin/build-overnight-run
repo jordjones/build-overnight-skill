@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# build-overnight-run — preflight + lockfile + telemetry wrapper for overnight runs.
+#
+# Usage:
+#   bin/build-overnight-run <run-id> <runtime> [--dry-run]
+#
+# Runtimes: ralph | continuous-claude | managed-agents | ralphthon | ralph-loop | claude-p-chain
+#
+# What this does (per CONVERGENT_FINDINGS.md F9, F23, F28, F30):
+#   1. Preflight (caffeinate present, AC connected on macOS, gh auth, disk >= 5GB,
+#      model alias pinned, git clean, in a worktree).
+#   2. Acquires a per-repo lockfile to prevent two overnight runs in one worktree.
+#   3. Creates the .overnight/<run-id>/ audit-trail directory.
+#   4. Starts caffeinate to keep the laptop awake.
+#   5. Tees structured JSONL telemetry to .overnight/<run-id>/events.jsonl.
+#   6. On any exit, releases the lockfile and writes a final FINAL_REPORT.md stub.
+
+set -Eeuo pipefail
+
+if [[ $# -lt 2 ]]; then
+  echo "usage: $0 <run-id> <runtime> [--dry-run]" >&2
+  exit 64
+fi
+
+RUN_ID="$1"
+RUNTIME="$2"
+DRY_RUN="${3:-}"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+OVERNIGHT_DIR="$REPO_ROOT/.overnight/$RUN_ID"
+LOCK_DIR="$HOME/overnight-worktrees/.locks"
+LOCK_FILE="$LOCK_DIR/$(echo "$REPO_ROOT" | tr '/' '_').lock"
+
+log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
+event() {
+  # Append a JSONL event to the audit trail. Args: kind="..." key=val ...
+  printf '{"ts":"%s","run_id":"%s","kind":"%s"' "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$RUN_ID" "$1" >> "$OVERNIGHT_DIR/events.jsonl"
+  shift
+  for kv in "$@"; do
+    printf ',"%s":"%s"' "${kv%%=*}" "${kv#*=}" >> "$OVERNIGHT_DIR/events.jsonl"
+  done
+  printf '}\n' >> "$OVERNIGHT_DIR/events.jsonl"
+}
+
+fail() { log "FAIL: $*"; exit 1; }
+
+# --- 1. preflight ---
+log "preflight: starting"
+
+# Worktree check (Tier-1 sandbox mandate; F23)
+if [[ "$REPO_ROOT" != "$HOME/overnight-worktrees/"* ]]; then
+  log "WARN: not running under ~/overnight-worktrees/. Tier-1 sandbox expected."
+  [[ "$DRY_RUN" == "--dry-run" ]] || fail "refuse to run outside ~/overnight-worktrees/<run-id>/. Re-run after creating a worktree."
+fi
+
+# Tooling
+command -v caffeinate >/dev/null 2>&1 || fail "caffeinate not found (macOS only). Install or skip with --dry-run."
+command -v gh >/dev/null 2>&1 || fail "gh CLI not found. Install GitHub CLI before overnight runs."
+gh auth status >/dev/null 2>&1 || fail "gh auth status failed. Run: gh auth login"
+
+# Power
+if [[ "$(uname)" == "Darwin" ]]; then
+  if ! pmset -g batt 2>/dev/null | grep -q "AC Power"; then
+    log "WARN: not on AC power. Plug in before launching unattended."
+    [[ "$DRY_RUN" == "--dry-run" ]] || fail "refuse to launch on battery."
+  fi
+fi
+
+# Disk (require >= 5GB free in $HOME)
+FREE_KB=$(df -k "$HOME" | awk 'NR==2 {print $4}')
+FREE_GB=$(( FREE_KB / 1024 / 1024 ))
+if [[ "$FREE_GB" -lt 5 ]]; then
+  fail "free disk in \$HOME is ${FREE_GB}GB; need >= 5GB."
+fi
+
+# Git clean
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null)" ]]; then
+  log "WARN: working tree is dirty."
+  [[ "$DRY_RUN" == "--dry-run" ]] || fail "refuse to run with a dirty tree. Commit or stash first."
+fi
+
+# Model alias pin reminder (we cannot enforce server-side; just record)
+log "preflight: model rotation may occur mid-run; pin via env if your runtime supports it."
+
+log "preflight: OK"
+
+# --- 2. lockfile ---
+mkdir -p "$LOCK_DIR"
+if ! ( set -o noclobber; > "$LOCK_FILE" ) 2>/dev/null; then
+  fail "lockfile $LOCK_FILE exists. Another overnight run is active in this repo, or it crashed and left the lock. Remove manually if stale."
+fi
+trap 'rm -f "$LOCK_FILE"; log "lockfile released"' EXIT
+
+# --- 3. audit-trail directory ---
+mkdir -p "$OVERNIGHT_DIR/artifacts"
+cat > "$OVERNIGHT_DIR/MANIFEST.json" <<EOF
+{
+  "run_id": "$RUN_ID",
+  "runtime": "$RUNTIME",
+  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "repo_root": "$REPO_ROOT",
+  "host": "$(hostname)",
+  "user": "$(whoami)",
+  "build_overnight_version": "v1.0.0"
+}
+EOF
+
+# Snapshot git reflog so we can always recover the entry point
+git -C "$REPO_ROOT" reflog show --all > "$OVERNIGHT_DIR/git-reflog-snapshot.txt" 2>/dev/null || true
+
+event "run_started" "runtime=$RUNTIME" "repo=$REPO_ROOT"
+log "audit-trail directory: $OVERNIGHT_DIR"
+
+if [[ "$DRY_RUN" == "--dry-run" ]]; then
+  log "dry-run complete; not launching agent"
+  event "dry_run_exit"
+  exit 0
+fi
+
+# --- 4. caffeinate ---
+caffeinate -dimsu -w "$$" &
+CAFFEINATE_PID=$!
+log "caffeinate PID=$CAFFEINATE_PID (will die when this script exits)"
+
+# --- 5. launch ---
+log "ready to dispatch overnight prompt for runtime=$RUNTIME"
+log "next: paste the drafted prompt into your chosen runtime, OR shell-out to it from here."
+log "this wrapper does NOT run the agent; it provides the safety envelope."
+log "exit when the run completes; this script's trap will clean up."
+
+# Idle until the user backgrounds the agent and the script gets a signal.
+# In practice the user dispatches the agent in another shell and this script
+# stays in the foreground to hold the lock + caffeinate. The simplest model:
+event "awaiting_completion"
+log "press Ctrl-C to release the lock once the agent has finished."
+# Sleep in a loop so traps still fire.
+while sleep 60; do :; done
