@@ -2,7 +2,14 @@
 
 All notable changes to `build-overnight` will be documented here.
 
-## [Unreleased]
+## [v1.0.0-rc1] — 2026-05-27
+
+Release candidate. Final `v1.0.0` tag pending **one successful real overnight run** through the skill (per Reconciler #1 compromise: "compromise between immediate-tag and 5-real-runs").
+
+### Test status
+- Layer 1 (static + coherence): **19/19 pass** (`$0`).
+- Layer 2 classification: **3/3 pass**; Sonnet judge opt-in via `--layer2` + valid `ANTHROPIC_API_KEY`.
+- Layer 3 (real-run fixture repos): deferred to v1.1.
 
 ### Added — v1.0.0 scope
 - `SKILL.md` adapted from `build-prompt`: 7-step interview loop, runtime question at Step 5, dispatch table for 6 overnight categories.

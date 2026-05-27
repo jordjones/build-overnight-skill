@@ -1,0 +1,20 @@
+[
+  {
+    "id": "fx-test-coverage",
+    "input": "raise branch coverage on src/billing/ to 0.85 overnight",
+    "expected_category": "test-coverage-overnight",
+    "notes": "explicit coverage target + module → test-coverage-overnight, NOT bug-hunt"
+  },
+  {
+    "id": "fx-bug-hunt",
+    "input": "test_invoice_pro_rated is flaky in CI, hunt the root cause overnight",
+    "expected_category": "bug-hunt-overnight",
+    "notes": "named failing test + 'root cause' → bug-hunt-overnight"
+  },
+  {
+    "id": "fx-research-deep",
+    "input": "research 2026 LLM-agent retry-policy best practices and synthesize a report",
+    "expected_category": "research-deep-overnight",
+    "notes": "external research + 'synthesize a report' → research-deep-overnight"
+  }
+]
