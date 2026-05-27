@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd ~/.claude/skills/build-overnight && sh scripts/validate_index.sh && echo \\\"---\\\" && ls library/ && echo \\\"---\\\" && python3 -c \\\"\\nimport yaml, glob, sys\\nfail = False\\nfor p in sorted(g...",
-  "error": "Exit code 1\nOK: 6 categories in sync between SKILL.md and references/categories/.\n---\n2026-05-27-bug-hunt-pro-rated-refund-flake.md\n2026-05-27-docs-pass-api-v2-google-style.md\n2026-05-27-feature-build-sso-from-prd.md\n2026-05-27-refactor-sweep-user-to-account.md\n2026-05-27-research-deep-retry-policies.md\n2026-05-27-test-coverage-oauth-branch-90.md\nfuture-work.md\n---\nERROR: Use `uv run python3 -c \nimport yaml, glob, sys\nfail = False\nfor p in sorted(glob.glob('library/2026-*.md')):\n    with open(p)...",
-  "timestamp": "2026-05-27T09:00:53.952Z",
-  "retry_count": 1
-}

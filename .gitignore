@@ -3,6 +3,9 @@ build-overnight-research/results/
 build-overnight-research/reports/
 build-overnight-research/.cache/
 
+# OMC plugin session state (per-session noise; should never have been tracked)
+.omc/
+
 # Local runs and audit trails
 .overnight/
 overnight-worktrees/
